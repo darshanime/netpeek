@@ -27,7 +27,7 @@ func main() {
 		panic("cannot open en0 interface for sniffing")
 	}
 	defer handle.Close()
-	err = handle.SetBPFFilter("tcp and dst port 80")
+	err = handle.SetBPFFilter("tcp and port 80")
 	if err != nil {
 		panic("incorrect bpf program")
 	}
