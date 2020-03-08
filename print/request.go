@@ -35,7 +35,7 @@ func Request(req *http.Request) {
 
 func getRequestContext(req *http.Request) requestContext {
 	defer req.Body.Close()
-	rc := requestContext{Method: req.Method, URL: req.Host + req.URL.RequestURI(), Headers: map[string]string{}}
+	rc := requestContext{Method: req.Method, URL: req.URL.String(), Headers: map[string]string{}}
 	rcBody, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		panic(fmt.Sprintf("cannot read req.Body - %s\n", err.Error()))

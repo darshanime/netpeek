@@ -1,46 +1,67 @@
 package stream
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"net/http"
 
-	"github.com/darshanime/netpeek/print"
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/tcpassembly"
-	"github.com/google/gopacket/tcpassembly/tcpreader"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/reassembly"
 )
 
 type HTTPStreamFactory struct{}
 
+type httpReader struct {
+	bytes chan []byte
+}
+
 type httpStream struct {
-	net, transport gopacket.Flow
-	reader         tcpreader.ReaderStream
+	netFlow       gopacket.Flow
+	transportFlow gopacket.Flow
+	reader        httpReader
+}
+
+type AssemblerContext struct {
+	CaptureInfo gopacket.CaptureInfo
+}
+
+func (c *AssemblerContext) GetCaptureInfo() gopacket.CaptureInfo {
+	return c.CaptureInfo
+}
+
+func (h httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, start *bool, ac reassembly.AssemblerContext) bool {
+	return true
+}
+
+func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
+	fmt.Printf("Connection closed\n")
+	return false
+}
+
+func (h *httpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.AssemblerContext) {
+	fmt.Printf("got some data\n")
 }
 
 // New is required to statisfy the StreamFactory inferface
-func (h *HTTPStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
-	fmt.Printf("********* starting a new stream for: %s, %s\n", net, transport)
+func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
+	fmt.Printf("********* starting a new stream for: %s, %s\n", netFlow, tcpFlow)
 	stream := &httpStream{
-		net:       net,
-		transport: transport,
-		reader:    tcpreader.NewReaderStream(),
+		netFlow:       netFlow,
+		transportFlow: tcpFlow,
 	}
-	go stream.run()
-	return &stream.reader
+	// go stream.run()
+	return stream
 }
 
-func (h *httpStream) run() {
-	buf := bufio.NewReader(&h.reader)
-	for {
-		req, err := http.ReadRequest(buf)
-		if err == io.EOF {
-			return
-		} else if err != nil {
-			fmt.Printf("cannot read request, %s\n", err.Error())
-		} else {
-			print.Request(req)
-		}
-	}
-}
+// func (h *httpStream) run() {
+// 	buf := bufio.NewReader(&h.reader)
+// 	for {
+// 		req, err := http.ReadRequest(buf)
+// 		if err == io.EOF {
+// 			return
+// 		} else if err != nil {
+// 			fmt.Printf("cannot read request, %s\n", err.Error())
+// 		} else {
+// 			print.Request(req)
+// 		}
+// 	}
+// }

@@ -9,7 +9,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/tcpassembly"
+	"github.com/google/gopacket/reassembly"
 )
 
 func main() {
@@ -34,8 +34,8 @@ func main() {
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
 	streamFactory := &stream.HTTPStreamFactory{}
-	streamPool := tcpassembly.NewStreamPool(streamFactory)
-	assembler := tcpassembly.NewAssembler(streamPool)
+	streamPool := reassembly.NewStreamPool(streamFactory)
+	assembler := reassembly.NewAssembler(streamPool)
 
 	packets := packetSource.Packets()
 	ticker := time.Tick(time.Minute)
@@ -50,11 +50,14 @@ func main() {
 				continue
 			}
 			tcp := packet.TransportLayer().(*layers.TCP)
-			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
+			c := stream.AssemblerContext{
+				CaptureInfo: packet.Metadata().CaptureInfo,
+			}
+			assembler.AssembleWithContext(packet.NetworkLayer().NetworkFlow(), tcp, &c)
 
 		case <-ticker:
 			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
-			assembler.FlushOlderThan(time.Now().Add(time.Minute * -2))
+			assembler.FlushCloseOlderThan(time.Now().Add(time.Minute * -2))
 		}
 	}
 }
