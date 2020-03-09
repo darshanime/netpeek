@@ -3,10 +3,13 @@ package stream
 import (
 	"bufio"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/darshanime/netpeek/print"
+	"github.com/darshanime/netpeek/stats"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/reassembly"
@@ -27,6 +30,12 @@ type httpStream struct {
 	clientReader  httpReader
 	serverReader  httpReader
 	request       *http.Request
+	stats         streamStats
+}
+
+type streamStats struct {
+	startTime time.Time
+	packets   []stats.PacketInfo
 }
 
 type AssemblerContext struct {
@@ -37,18 +46,36 @@ func (c *AssemblerContext) GetCaptureInfo() gopacket.CaptureInfo {
 	return c.CaptureInfo
 }
 
-func (h httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, start *bool, ac reassembly.AssemblerContext) bool {
+func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, start *bool, ac reassembly.AssemblerContext) bool {
+	captureInfo := ac.GetCaptureInfo()
+	if *start {
+		h.stats.startTime = captureInfo.Timestamp
+	}
+	pktInfo := stats.PacketInfo{
+		FIN:           tcp.FIN,
+		SYN:           tcp.SYN,
+		RST:           tcp.RST,
+		PSH:           tcp.PSH,
+		ACK:           tcp.ACK,
+		URG:           tcp.URG,
+		ECE:           tcp.ECE,
+		CWR:           tcp.CWR,
+		NS:            tcp.NS,
+		CaptureLength: captureInfo.CaptureLength,
+		Timestamp:     captureInfo.Timestamp.Sub(h.stats.startTime),
+		Dir:           template.HTML(dir.String()),
+	}
+	h.stats.packets = append(h.stats.packets, pktInfo)
 	return true
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	fmt.Printf("Connection closed\n")
-	return false
+	fmt.Println("Connection closed")
+	return true
 }
 
 func (h *httpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.AssemblerContext) {
-	dir, start, end, skip := sg.Info()
-	fmt.Printf("info: dir %s, start %t, end %t, skip %t\n", dir, start, end, skip)
+	dir, _, _, _ := sg.Info()
 	length, _ := sg.Lengths()
 	data := sg.Fetch(length)
 	if dir == reassembly.TCPDirClientToServer {
@@ -56,8 +83,6 @@ func (h *httpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.As
 	} else {
 		h.serverReader.bytes <- data
 	}
-	// fmt.Printf("got some data, (%d, %d): %s\n", length, saved, string(data))
-
 }
 
 func (h *httpReader) Read(p []byte) (int, error) {
@@ -109,7 +134,7 @@ func (h *httpReader) read() {
 			} else if err != nil {
 				fmt.Printf("cannot read request, %s\n", err.Error())
 			} else {
-				print.Response(h.stream.request, resp)
+				print.Response(h.stream.request, resp, h.stream.stats.packets)
 			}
 		}
 	}
