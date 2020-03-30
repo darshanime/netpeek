@@ -3,13 +3,14 @@ package stream
 import (
 	"bufio"
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/darshanime/netpeek/print"
+	"github.com/darshanime/netpeek/cui"
 	"github.com/darshanime/netpeek/stats"
+	"github.com/jroimartin/gocui"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/reassembly"
@@ -31,6 +32,7 @@ type httpStream struct {
 	serverReader  httpReader
 	request       *http.Request
 	stats         streamStats
+	cui           *gocui.Gui
 }
 
 type streamStats struct {
@@ -63,15 +65,15 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 		NS:            tcp.NS,
 		CaptureLength: captureInfo.CaptureLength,
 		Timestamp:     captureInfo.Timestamp.Sub(h.stats.startTime),
-		Dir:           template.HTML(dir.String()),
+		Dir:           dir.String(),
 	}
 	h.stats.packets = append(h.stats.packets, pktInfo)
 	return true
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	fmt.Println("Connection closed")
-	return true
+	// fmt.Println("Connection closed")
+	return false
 }
 
 func (h *httpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.AssemblerContext) {
@@ -101,7 +103,7 @@ func (h *httpReader) Read(p []byte) (int, error) {
 
 // New is required to statisfy the StreamFactory inferface
 func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
-	fmt.Printf("********* starting a new stream for: %s, %s\n", netFlow, tcpFlow)
+	cui.AddConnection(netFlow, tcpFlow)
 	stream := &httpStream{
 		netFlow:       netFlow,
 		transportFlow: tcpFlow,
@@ -110,12 +112,12 @@ func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP,
 	}
 	stream.clientReader.stream = stream
 	stream.serverReader.stream = stream
-	go stream.clientReader.read()
-	go stream.serverReader.read()
+	go stream.clientReader.read(netFlow, tcpFlow)
+	go stream.serverReader.read(netFlow, tcpFlow)
 	return stream
 }
 
-func (h *httpReader) read() {
+func (h *httpReader) read(netFlow, tcpFlow gopacket.Flow) {
 	buf := bufio.NewReader(h)
 	for {
 		if h.isClient {
@@ -123,7 +125,7 @@ func (h *httpReader) read() {
 			if err == io.EOF {
 				return
 			} else if err != nil {
-				fmt.Printf("cannot read request, %s\n", err.Error())
+				fmt.Printf("~~cannot read request, %s\n", err.Error())
 			} else {
 				h.stream.request = req
 			}
@@ -132,9 +134,10 @@ func (h *httpReader) read() {
 			if err == io.EOF {
 				return
 			} else if err != nil {
-				fmt.Printf("cannot read request, %s\n", err.Error())
+				fmt.Printf("~~cannot read response, %s\n", err.Error())
 			} else {
-				print.Response(h.stream.request, resp, h.stream.stats.packets)
+				cui.AddRequest(netFlow, tcpFlow, h.stream.request, resp, h.stream.stats.packets)
+				// print.Response(h.stream.request, resp, h.stream.stats.packets)
 			}
 		}
 	}

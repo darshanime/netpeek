@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/darshanime/netpeek/cui"
 	"github.com/darshanime/netpeek/stream"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -14,13 +15,6 @@ import (
 
 func main() {
 	fmt.Printf("%s\n", pcap.Version())
-	devices, err := pcap.FindAllDevs()
-	if err != nil {
-		panic("could not FindAllDevs")
-	}
-	for _, device := range devices {
-		fmt.Printf("device: %s\n", device.Name)
-	}
 
 	handle, err := pcap.OpenLive("en0", int32(65535), true, pcap.BlockForever)
 	if err != nil {
@@ -39,6 +33,7 @@ func main() {
 
 	packets := packetSource.Packets()
 	ticker := time.Tick(time.Minute)
+	go cui.InitCui()
 	for {
 		select {
 		case packet := <-packets:
