@@ -34,6 +34,7 @@ func AddRequest(netflow, tcpflow gopacket.Flow, req *http.Request, resp *http.Re
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorGreen
 		v.SelFgColor = gocui.ColorBlack
+		v.SetCursor(0, 2)
 		requestsListAddLine(v, "", "Request", "Code", "#pkts", "Latency")
 		fmt.Fprintln(v, strings.Repeat("─", maxX))
 	}

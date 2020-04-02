@@ -42,6 +42,10 @@ func InitCui() {
 		log.Panicln(err)
 	}
 
+	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, actionArrowLeftKey); err != nil {
+		log.Panicln(err)
+	}
+
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
 	}
@@ -64,7 +68,7 @@ func layout(g *gocui.Gui) error {
 		fmt.Fprintln(v, "⣿ NetPeek")
 	}
 
-	if v, err := g.SetView("conns", -1, 1, maxX, maxY-1); err != nil {
+	if v, err := g.SetView("conns", -1, 1, maxX, maxY-2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -94,7 +98,7 @@ func layout(g *gocui.Gui) error {
 		v.FgColor = gocui.ColorWhite
 
 		// Content
-		changeStatusContext(g, "C")
+		updateStatus(g, "C")
 	}
 
 	return nil
@@ -108,41 +112,6 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 func viewConnsAddLine(v *gocui.View, src, dst string) {
 	line := pad.Right(src, 30, " ") + pad.Right(dst, 30, " ")
 	fmt.Fprintln(v, line)
-}
-
-func changeStatusContext(g *gocui.Gui, c string) error {
-	lMaxX, _ := g.Size()
-	v, err := g.View("status")
-	if err != nil {
-		return err
-	}
-
-	v.Clear()
-
-	i := lMaxX + 4
-	b := ""
-
-	switch c {
-	case "C":
-		i = 150 + i
-		b = b + frameText("↑") + " Up   "
-		b = b + frameText("↓") + " Down   "
-		b = b + frameText("Enter") + " View Requests   "
-	case "SE":
-		i = i + 100
-		b = b + frameText("↑") + " Up   "
-		b = b + frameText("↓") + " Down   "
-		b = b + frameText("Enter") + " Select   "
-	case "SL":
-		i = i + 100
-		b = b + frameText("q") + " Back   "
-		b = b + frameText("Enter") + " Select   "
-	}
-	b = b + frameText("CTRL+C") + " Exit"
-
-	fmt.Fprintln(v, pad.Right(b, i, " "))
-
-	return nil
 }
 
 // StringFormatBoth fg and bg colors
