@@ -1,7 +1,6 @@
 package stats
 
 import (
-	"strconv"
 	"time"
 )
 
@@ -13,7 +12,7 @@ type PacketInfo struct {
 }
 
 func (p *PacketInfo) String() string {
-	return getDirection(p) + " " + getFlags(p) + " " + strconv.Itoa(p.CaptureLength) + p.Timestamp.String()
+	return getDirection(p) + " " + getFlags(p) + p.Timestamp.String()
 }
 
 func getDirection(p *PacketInfo) string {
