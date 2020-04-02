@@ -25,12 +25,12 @@ func AddRequest(netflow, tcpflow gopacket.Flow, req *http.Request, resp *http.Re
 
 	fmt.Fprintln(os.Stderr, "creating: reqs->list"+conn)
 
-	v, err := g.SetView("reqs->list"+conn, -1, 1, maxX, maxY-1)
+	v, err := g.SetView("reqs->list"+conn, -1, 1, maxX, maxY-2)
 	if err != nil && err != gocui.ErrUnknownView {
 		panic("error with view")
 	}
 	if err == gocui.ErrUnknownView {
-		v.Frame = false
+		v.Frame = true
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorGreen
 		v.SelFgColor = gocui.ColorBlack
