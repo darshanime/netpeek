@@ -42,6 +42,10 @@ func InitCui() {
 		log.Panicln(err)
 	}
 
+	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, actionEnterKey); err != nil {
+		log.Panicln(err)
+	}
+
 	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, actionArrowLeftKey); err != nil {
 		log.Panicln(err)
 	}
