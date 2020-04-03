@@ -134,10 +134,14 @@ func (h *httpReader) read(netFlow, tcpFlow gopacket.Flow) {
 			if err == io.EOF {
 				return
 			} else if err != nil {
-				fmt.Printf("~~cannot read response, %s\n", err.Error())
+				fmt.Fprintln(os.Stderr, "cannot read request, %s\n", err.Error())
 			} else {
-				cui.AddRequest(netFlow, tcpFlow, h.stream.request, resp, h.stream.stats.packets)
-				// print.Response(h.stream.request, resp, h.stream.stats.packets)
+				if *h.stream.useCui {
+					cui.AddRequest(netFlow, tcpFlow, h.stream.request, resp, h.stream.stats.packets)
+				} else {
+					print.Response2(h.stream.request, resp, h.stream.stats.packets)
+					h.stream.stats = streamStats{}
+				}
 			}
 		}
 	}
