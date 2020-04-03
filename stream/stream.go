@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -75,7 +76,10 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	fmt.Fprintln(os.Stderr, "connection closed, %s\n")
+	fmt.Fprintln(os.Stderr, "closing old connection, %s", h.netFlow.Src().String()+":"+h.transportFlow.Src().String())
+	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
+		print.Response2(nil, nil, h.stats.packets)
+	}
 	return false
 }
 
@@ -121,13 +125,17 @@ func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP,
 	}
 	stream.clientReader.stream = stream
 	stream.serverReader.stream = stream
-	go stream.clientReader.read(netFlow, tcpFlow)
-	go stream.serverReader.read(netFlow, tcpFlow)
+	go stream.clientReader.read()
+	go stream.serverReader.read()
 	return stream
 }
 
-func (h *httpReader) read(netFlow, tcpFlow gopacket.Flow) {
+func (h *httpReader) read() {
 	buf := bufio.NewReader(h)
+	if isSSL(h.stream.transportFlow) {
+		go drainPackets(h)
+		io.Copy(ioutil.Discard, buf)
+	}
 	for {
 		if h.isClient {
 			req, err := http.ReadRequest(buf)
@@ -146,12 +154,29 @@ func (h *httpReader) read(netFlow, tcpFlow gopacket.Flow) {
 				fmt.Fprintln(os.Stderr, "cannot read request, %s\n", err.Error())
 			} else {
 				if *h.stream.useCui {
-					cui.AddRequest(netFlow, tcpFlow, h.stream.request, resp, h.stream.stats.packets)
+					cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, h.stream.request, resp, h.stream.stats.packets)
 				} else {
 					print.Response2(h.stream.request, resp, h.stream.stats.packets)
 					h.stream.stats = streamStats{}
 				}
 			}
+		}
+	}
+}
+
+func isSSL(tcpflow gopacket.Flow) bool {
+	return tcpflow.Src().String() == "443" || tcpflow.Dst().String() == "443"
+}
+
+func drainPackets(h *httpReader) {
+	ticker := time.Tick(5 * time.Second)
+	for {
+		select {
+		case <-ticker:
+			if len(h.stream.stats.packets) != 0 {
+				print.Response2(nil, nil, h.stream.stats.packets)
+			}
+			h.stream.stats = streamStats{}
 		}
 	}
 }
