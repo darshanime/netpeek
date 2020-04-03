@@ -1,8 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/darshanime/netpeek/cui"
@@ -13,7 +15,12 @@ import (
 	"github.com/google/gopacket/reassembly"
 )
 
+var iface = flag.String("i", "eth0", "Interface to read packets from")
+var useCui = flag.Bool("cui", false, "Set CUI mode")
+var bpf = flag.String("bpf", "tcp port 80", "bpf program")
+
 func main() {
+	flag.Parse()
 	fmt.Printf("%s\n", pcap.Version())
 
 	handle, err := pcap.OpenLive("en0", int32(65535), true, pcap.BlockForever)
@@ -21,22 +28,28 @@ func main() {
 		panic("cannot open en0 interface for sniffing")
 	}
 	defer handle.Close()
-	err = handle.SetBPFFilter("tcp and port 80")
+	err = handle.SetBPFFilter(*bpf)
 	if err != nil {
 		panic("incorrect bpf program")
 	}
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
-	streamFactory := &stream.HTTPStreamFactory{}
+	streamFactory := &stream.HTTPStreamFactory{UseCui: useCui}
 	streamPool := reassembly.NewStreamPool(streamFactory)
 	assembler := reassembly.NewAssembler(streamPool)
 
 	packets := packetSource.Packets()
 	ticker := time.Tick(time.Minute)
-	go cui.InitCui()
+	if *useCui {
+		go cui.InitCui()
+	}
 	for {
 		select {
 		case packet := <-packets:
+			if !*useCui {
+				fmt.Fprintf(os.Stdout, "#")
+			}
+
 			if packet == nil {
 				return
 			}
@@ -51,7 +64,6 @@ func main() {
 			assembler.AssembleWithContext(packet.NetworkLayer().NetworkFlow(), tcp, &c)
 
 		case <-ticker:
-			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
 			assembler.FlushCloseOlderThan(time.Now().Add(time.Minute * -2))
 		}
 	}

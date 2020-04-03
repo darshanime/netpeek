@@ -5,18 +5,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/darshanime/netpeek/cui"
+	"github.com/darshanime/netpeek/print"
 	"github.com/darshanime/netpeek/stats"
-	"github.com/jroimartin/gocui"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/reassembly"
 )
 
-type HTTPStreamFactory struct{}
+type HTTPStreamFactory struct {
+	UseCui *bool
+}
 
 type httpReader struct {
 	isClient bool
@@ -32,7 +35,7 @@ type httpStream struct {
 	serverReader  httpReader
 	request       *http.Request
 	stats         streamStats
-	cui           *gocui.Gui
+	useCui        *bool
 }
 
 type streamStats struct {
@@ -72,7 +75,7 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	// fmt.Println("Connection closed")
+	fmt.Fprintln(os.Stderr, "connection closed, %s\n")
 	return false
 }
 
@@ -103,12 +106,18 @@ func (h *httpReader) Read(p []byte) (int, error) {
 
 // New is required to statisfy the StreamFactory inferface
 func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
-	cui.AddConnection(netFlow, tcpFlow)
+	fmt.Fprintln(os.Stderr, "adding new connection, %s", netFlow.Src().String()+":"+tcpFlow.Src().String())
+	if *h.UseCui {
+		cui.AddConnection(netFlow, tcpFlow)
+	} else {
+		fmt.Fprintf(os.Stdout, "Connection:\n%s\n", netFlow.Src().String()+":"+tcpFlow.Src().String())
+	}
 	stream := &httpStream{
 		netFlow:       netFlow,
 		transportFlow: tcpFlow,
 		clientReader:  httpReader{bytes: make(chan []byte), isClient: true},
 		serverReader:  httpReader{bytes: make(chan []byte), isClient: false},
+		useCui:        h.UseCui,
 	}
 	stream.clientReader.stream = stream
 	stream.serverReader.stream = stream
@@ -125,7 +134,7 @@ func (h *httpReader) read(netFlow, tcpFlow gopacket.Flow) {
 			if err == io.EOF {
 				return
 			} else if err != nil {
-				fmt.Printf("~~cannot read request, %s\n", err.Error())
+				fmt.Fprintln(os.Stderr, "cannot read request, %s\n", err.Error())
 			} else {
 				h.stream.request = req
 			}

@@ -25,12 +25,12 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 		if err != gocui.ErrUnknownView {
 			panic("panic in set view")
 		}
-
+		v.Autoscroll = false
 		v.Frame = true
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(reqDetailName)
-	fmt.Fprintln(v, requestToString(req))
+	fmt.Fprintln(v, RequestToString(req))
 
 	// setting the response view
 	fmt.Fprintln(os.Stderr, "creating: "+respDetailName)
@@ -40,11 +40,12 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 			panic("panic in set view")
 		}
 
+		v.Autoscroll = false
 		v.Frame = true
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(respDetailName)
-	fmt.Fprintln(v, responseToString(resp))
+	fmt.Fprintln(v, ResponseToString(resp))
 
 	// setting the packets view
 	fmt.Fprintln(os.Stderr, "creating: "+pktDetailName)
@@ -53,18 +54,19 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 		if err != gocui.ErrUnknownView {
 			panic("panic in set view")
 		}
+		v.Autoscroll = false
 		v.Frame = true
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(pktDetailName)
-	fmt.Fprintln(v, packetsToString(pktInfo))
+	fmt.Fprintln(v, PacketsToString(pktInfo))
 }
 
 func getRequestDetailView(req *http.Request, suffix string) string {
 	return req.URL.String() + suffix
 }
 
-func requestToString(req *http.Request) string {
+func RequestToString(req *http.Request) string {
 	var str strings.Builder
 	str.WriteString(req.Method + " " + req.URL.String() + "\n")
 	for key, val := range req.Header {
@@ -80,7 +82,7 @@ func requestToString(req *http.Request) string {
 	return str.String()
 }
 
-func responseToString(resp *http.Response) string {
+func ResponseToString(resp *http.Response) string {
 	var str strings.Builder
 	for key, val := range resp.Header {
 		str.WriteString(key + ": " + strings.Join(val, ",") + "\n")
@@ -95,7 +97,7 @@ func responseToString(resp *http.Response) string {
 	return str.String()
 }
 
-func packetsToString(pktInfo []stats.PacketInfo) string {
+func PacketsToString(pktInfo []stats.PacketInfo) string {
 	var str strings.Builder
 	for _, pkt := range pktInfo {
 		str.WriteString(pkt.String() + "\n")
