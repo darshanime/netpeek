@@ -54,7 +54,7 @@ func (c *AssemblerContext) GetCaptureInfo() gopacket.CaptureInfo {
 
 func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, start *bool, ac reassembly.AssemblerContext) bool {
 	captureInfo := ac.GetCaptureInfo()
-	if *start {
+	if *start || h.stats.startTime.IsZero() {
 		h.stats.startTime = captureInfo.Timestamp
 	}
 	pktInfo := stats.PacketInfo{
@@ -76,7 +76,7 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	fmt.Fprintln(os.Stderr, "closing old connection, %s", h.netFlow.Src().String()+":"+h.transportFlow.Src().String())
+	fmt.Fprintln(os.Stderr, fmt.Sprintf("\nclosing old connection, %s\n", connDir(h.netFlow, h.transportFlow)))
 	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
 		print.Response2(nil, nil, h.stats.packets)
 	}
@@ -110,11 +110,10 @@ func (h *httpReader) Read(p []byte) (int, error) {
 
 // New is required to statisfy the StreamFactory inferface
 func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
-	fmt.Fprintln(os.Stderr, "adding new connection, %s", netFlow.Src().String()+":"+tcpFlow.Src().String())
 	if *h.UseCui {
 		cui.AddConnection(netFlow, tcpFlow)
 	} else {
-		fmt.Fprintf(os.Stdout, "Connection:\n%s\n", netFlow.Src().String()+":"+tcpFlow.Src().String())
+		fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new connection, %s\n", connDir(netFlow, tcpFlow)))
 	}
 	stream := &httpStream{
 		netFlow:       netFlow,
@@ -179,4 +178,8 @@ func drainPackets(h *httpReader) {
 			h.stream.stats = streamStats{}
 		}
 	}
+}
+
+func connDir(netflow, tcpflow gopacket.Flow) string {
+	return netflow.Src().String() + ":" + tcpflow.Src().String() + "-->" + netflow.Dst().String() + ":" + tcpflow.Dst().String()
 }
