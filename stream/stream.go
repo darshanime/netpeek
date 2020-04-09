@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -18,8 +17,17 @@ import (
 	"github.com/google/gopacket/reassembly"
 )
 
+type Protocol int
+
+const (
+	HTTP Protocol = iota
+	HTTPS
+	Unknown
+)
+
 type HTTPStreamFactory struct {
-	UseCui *bool
+	UseCui   *bool
+	HTTPPort *string
 }
 
 type httpReader struct {
@@ -37,6 +45,7 @@ type httpStream struct {
 	request       *http.Request
 	stats         streamStats
 	useCui        *bool
+	protocol      Protocol
 }
 
 type streamStats struct {
@@ -124,47 +133,80 @@ func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP,
 	}
 	stream.clientReader.stream = stream
 	stream.serverReader.stream = stream
+	stream.protocol = getProtocol(stream, *h.HTTPPort)
 	go stream.clientReader.read()
 	go stream.serverReader.read()
 	return stream
 }
 
 func (h *httpReader) read() {
-	buf := bufio.NewReader(h)
-	if isSSL(h.stream.transportFlow) {
-		go drainPackets(h)
-		io.Copy(ioutil.Discard, buf)
-	}
-	for {
+	switch h.stream.protocol {
+	case HTTP:
 		if h.isClient {
-			req, err := http.ReadRequest(buf)
-			if err == io.EOF {
-				return
-			} else if err != nil {
-				fmt.Fprintln(os.Stderr, "cannot read request, %s\n", err.Error())
-			} else {
-				h.stream.request = req
-			}
+			fmt.Fprintln(os.Stderr, "starting http request reader")
+			go readHTTPRequest(h)
 		} else {
-			resp, err := http.ReadResponse(buf, h.stream.request)
-			if err == io.EOF {
-				return
-			} else if err != nil {
-				fmt.Fprintln(os.Stderr, "cannot read request, %s\n", err.Error())
+			fmt.Fprintln(os.Stderr, "starting http response reader")
+			go readHTTPResponse(h)
+		}
+	case HTTPS:
+		go drainPackets(h)
+	case Unknown:
+		go dumpPackets(h)
+	}
+}
+
+func readHTTPResponse(h *httpReader) {
+	buf := bufio.NewReader(h)
+	for {
+		resp, err := http.ReadResponse(buf, nil)
+		fmt.Fprintln(os.Stderr, "read response")
+		if err == io.EOF {
+			fmt.Fprintln(os.Stderr, "stopped reading response, got EOF, %s\n", err.Error())
+			return
+		} else if err != nil {
+			fmt.Fprintln(os.Stderr, "cannot read response, %s\n", err.Error())
+		} else {
+			if *h.stream.useCui {
+				cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, h.stream.request, resp, h.stream.stats.packets)
 			} else {
-				if *h.stream.useCui {
-					cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, h.stream.request, resp, h.stream.stats.packets)
-				} else {
-					print.Response2(h.stream.request, resp, h.stream.stats.packets)
-					h.stream.stats = streamStats{}
-				}
+				print.Response2(h.stream.request, resp, h.stream.stats.packets)
+				h.stream.stats = streamStats{}
 			}
 		}
 	}
 }
 
-func isSSL(tcpflow gopacket.Flow) bool {
-	return tcpflow.Src().String() == "443" || tcpflow.Dst().String() == "443"
+func readHTTPRequest(h *httpReader) {
+	buf := bufio.NewReader(h)
+	for {
+		req, err := http.ReadRequest(buf)
+		fmt.Fprintln(os.Stderr, "read request")
+		if err == io.EOF {
+			fmt.Fprintln(os.Stderr, "stopped reading request, got EOF, %s\n", err.Error())
+			return
+		} else if err != nil {
+			fmt.Fprintln(os.Stderr, "cannot read request, %s\n", err.Error())
+		} else {
+			h.stream.request = req
+		}
+	}
+}
+
+func getProtocol(h *httpStream, appPort string) Protocol {
+	src, dst := h.transportFlow.Dst().String(), h.transportFlow.Src().String()
+
+	if src == appPort || dst == appPort {
+		fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new protocol, http\n"))
+		return HTTP
+	}
+
+	if src == "443" || dst == "443" {
+		fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new protocol, https\n"))
+		return HTTPS
+	}
+	fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new protocol, unknown\n"))
+	return Unknown
 }
 
 func drainPackets(h *httpReader) {
@@ -174,6 +216,20 @@ func drainPackets(h *httpReader) {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
 				print.Response2(nil, nil, h.stream.stats.packets)
+			}
+			h.stream.stats = streamStats{}
+		}
+	}
+}
+
+func dumpPackets(h *httpReader) {
+	buf := bufio.NewReader(h)
+	ticker := time.Tick(5 * time.Second)
+	for {
+		select {
+		case <-ticker:
+			if len(h.stream.stats.packets) != 0 {
+				io.Copy(os.Stdout, buf)
 			}
 			h.stream.stats = streamStats{}
 		}

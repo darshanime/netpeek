@@ -15,17 +15,24 @@ import (
 	"github.com/google/gopacket/reassembly"
 )
 
-var iface = flag.String("i", "eth0", "Interface to read packets from")
-var useCui = flag.Bool("cui", false, "Set CUI mode")
-var bpf = flag.String("bpf", "tcp port 80", "bpf program")
+var iface = flag.String("i", "en0", "interface to read packets from")
+var useCui = flag.Bool("cui", false, "set CUI mode")
+var bpf = flag.String("bpf", "tcp", "bpf program")
+var appPort = flag.String("port", "80", "application http port")
+var quiet = flag.Bool("q", false, "quiet mode")
 
 func main() {
 	flag.Parse()
 	fmt.Printf("%s\n", pcap.Version())
+	fmt.Printf("iface %s\n", *iface)
+	fmt.Printf("useCui %t\n", *useCui)
+	fmt.Printf("bpf %s\n", *bpf)
+	fmt.Printf("appPort %s\n", *appPort)
+	fmt.Printf("quiet %t\n", *quiet)
 
-	handle, err := pcap.OpenLive("en0", int32(65535), true, pcap.BlockForever)
+	handle, err := pcap.OpenLive(*iface, int32(65535), true, pcap.BlockForever)
 	if err != nil {
-		panic("cannot open en0 interface for sniffing")
+		panic(fmt.Sprintf("cannot open %s interface for sniffing", *iface))
 	}
 	defer handle.Close()
 	err = handle.SetBPFFilter(*bpf)
@@ -34,7 +41,7 @@ func main() {
 	}
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
-	streamFactory := &stream.HTTPStreamFactory{UseCui: useCui}
+	streamFactory := &stream.HTTPStreamFactory{UseCui: useCui, HTTPPort: appPort}
 	streamPool := reassembly.NewStreamPool(streamFactory)
 	assembler := reassembly.NewAssembler(streamPool)
 
@@ -46,7 +53,7 @@ func main() {
 	for {
 		select {
 		case packet := <-packets:
-			if !*useCui {
+			if !*useCui && !*quiet {
 				fmt.Fprintf(os.Stdout, "#")
 			}
 
