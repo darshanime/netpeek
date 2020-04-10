@@ -21,6 +21,10 @@ func init() {
 
 func AddRequest(netflow, tcpflow gopacket.Flow, req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
 	conn := getRequestName(netflow, tcpflow)
+	if req == nil {
+		fmt.Fprintln(os.Stderr, "not creating: reqs->list"+conn)
+		return
+	}
 	maxX, maxY := g.Size()
 
 	fmt.Fprintln(os.Stderr, "creating: reqs->list"+conn)

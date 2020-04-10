@@ -10,11 +10,17 @@ import (
 )
 
 func Response2(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
+	var reqStr, respStr, pktStr string
 	if req != nil {
-		fmt.Fprintf(os.Stdout, "\nRequest:\n%s", cui.RequestToString(req))
+		reqStr = cui.RequestToString(req)
+	} else {
+		reqStr = "**** no req\n"
 	}
 	if resp != nil {
-		fmt.Fprintf(os.Stdout, "\nResponse:\n%s", cui.ResponseToString(resp))
+		respStr = cui.ResponseToString(resp)
+	} else {
+		respStr = "**** no resp\n"
 	}
-	fmt.Fprintf(os.Stdout, "\nPackets:\n%s", cui.PacketsToString(pktInfo))
+	pktStr = cui.PacketsToString(pktInfo)
+	fmt.Fprintf(os.Stdout, "\nRequest:\n%s\nResponse:\n%s\n\nPackets:\n%s", reqStr, respStr, pktStr)
 }

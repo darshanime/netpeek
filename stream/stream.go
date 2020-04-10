@@ -19,6 +19,8 @@ import (
 
 type Protocol int
 
+var output *os.File
+
 const (
 	HTTP Protocol = iota
 	HTTPS
@@ -85,7 +87,7 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	fmt.Fprintln(os.Stderr, fmt.Sprintf("\nclosing old connection, %s\n", connDir(h.netFlow, h.transportFlow)))
+	fmt.Fprintln(output, fmt.Sprintf("\nclosing old connection, %s\n", connDir(h.netFlow, h.transportFlow)))
 	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
 		print.Response2(nil, nil, h.stats.packets)
 	}
@@ -122,7 +124,7 @@ func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP,
 	if *h.UseCui {
 		cui.AddConnection(netFlow, tcpFlow)
 	} else {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new connection, %s\n", connDir(netFlow, tcpFlow)))
+		fmt.Fprintf(output, fmt.Sprintf("\nadding new connection, %s\n", connDir(netFlow, tcpFlow)))
 	}
 	stream := &httpStream{
 		netFlow:       netFlow,
@@ -130,6 +132,11 @@ func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP,
 		clientReader:  httpReader{bytes: make(chan []byte), isClient: true},
 		serverReader:  httpReader{bytes: make(chan []byte), isClient: false},
 		useCui:        h.UseCui,
+	}
+	if *h.UseCui {
+		output = os.Stderr
+	} else {
+		output = os.Stdout
 	}
 	stream.clientReader.stream = stream
 	stream.serverReader.stream = stream
@@ -143,10 +150,10 @@ func (h *httpReader) read() {
 	switch h.stream.protocol {
 	case HTTP:
 		if h.isClient {
-			fmt.Fprintln(os.Stderr, "starting http request reader")
+			fmt.Fprintln(output, "starting http request reader")
 			go readHTTPRequest(h)
 		} else {
-			fmt.Fprintln(os.Stderr, "starting http response reader")
+			fmt.Fprintln(output, "starting http response reader")
 			go readHTTPResponse(h)
 		}
 	case HTTPS:
@@ -159,13 +166,13 @@ func (h *httpReader) read() {
 func readHTTPResponse(h *httpReader) {
 	buf := bufio.NewReader(h)
 	for {
-		resp, err := http.ReadResponse(buf, nil)
-		fmt.Fprintln(os.Stderr, "read response")
+		resp, err := http.ReadResponse(buf, h.stream.request)
+		fmt.Fprintf(output, "read response %v\n", err)
 		if err == io.EOF {
-			fmt.Fprintln(os.Stderr, "stopped reading response, got EOF, %s\n", err.Error())
+			fmt.Fprintln(output, "stopped reading response, got EOF, %s\n", err.Error())
 			return
 		} else if err != nil {
-			fmt.Fprintln(os.Stderr, "cannot read response, %s\n", err.Error())
+			fmt.Fprintln(output, "cannot read response, %s\n", err.Error())
 		} else {
 			if *h.stream.useCui {
 				cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, h.stream.request, resp, h.stream.stats.packets)
@@ -181,12 +188,12 @@ func readHTTPRequest(h *httpReader) {
 	buf := bufio.NewReader(h)
 	for {
 		req, err := http.ReadRequest(buf)
-		fmt.Fprintln(os.Stderr, "read request")
+		fmt.Fprintf(output, "read request %v\n", err)
 		if err == io.EOF {
-			fmt.Fprintln(os.Stderr, "stopped reading request, got EOF, %s\n", err.Error())
+			fmt.Fprintln(output, "stopped reading request, got EOF, %s\n", err.Error())
 			return
 		} else if err != nil {
-			fmt.Fprintln(os.Stderr, "cannot read request, %s\n", err.Error())
+			fmt.Fprintln(output, "cannot read request, %s\n", err.Error())
 		} else {
 			h.stream.request = req
 		}
@@ -197,15 +204,15 @@ func getProtocol(h *httpStream, appPort string) Protocol {
 	src, dst := h.transportFlow.Dst().String(), h.transportFlow.Src().String()
 
 	if src == appPort || dst == appPort {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new protocol, http\n"))
+		fmt.Fprintf(output, fmt.Sprintf("\nadding new protocol, http\n"))
 		return HTTP
 	}
 
 	if src == "443" || dst == "443" {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new protocol, https\n"))
+		fmt.Fprintf(output, fmt.Sprintf("\nadding new protocol, https\n"))
 		return HTTPS
 	}
-	fmt.Fprintf(os.Stdout, fmt.Sprintf("\nadding new protocol, unknown\n"))
+	fmt.Fprintf(output, fmt.Sprintf("\nadding new protocol, unknown\n"))
 	return Unknown
 }
 
@@ -229,7 +236,7 @@ func dumpPackets(h *httpReader) {
 		select {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
-				io.Copy(os.Stdout, buf)
+				io.Copy(output, buf)
 			}
 			h.stream.stats = streamStats{}
 		}
