@@ -17,9 +17,9 @@ func (p *PacketInfo) String() string {
 
 func getDirection(p *PacketInfo) string {
 	if p.Dir == "client->server" {
-		return "<--"
+		return "-->"
 	}
-	return "-->"
+	return "<--"
 }
 
 func getFlags(p *PacketInfo) string {
