@@ -2,8 +2,6 @@ package cui
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"strings"
 
 	"github.com/google/gopacket"
@@ -15,43 +13,41 @@ var g *gocui.Gui
 
 var connMap map[gopacket.Flow]int
 
+type Key struct {
+	viewname string
+	key      interface{}
+	handler  func(*gocui.Gui, *gocui.View) error
+}
+
+var keys []Key = []Key{
+	Key{"", gocui.KeyCtrlC, actionGlobalQuit},
+	Key{"", gocui.KeyArrowUp, actionGlobalArrowUp},
+	Key{"", gocui.KeyArrowDown, actionGlobalArrowDown},
+	Key{"", gocui.KeyEnter, actionEnterKey},
+	Key{"", gocui.KeyArrowRight, actionEnterKey},
+	Key{"", gocui.KeyArrowLeft, actionArrowLeftKey},
+}
+
 func InitCui() {
 	gui, err := gocui.NewGui(gocui.OutputNormal)
 	connMap = map[gopacket.Flow]int{}
 
 	if err != nil {
-		log.Panicln(err)
+		panic(fmt.Sprintf("could not init new gui: %s\n", err.Error()))
 	}
+
 	g = gui
 
 	g.SetManagerFunc(layout)
 
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-		log.Panicln(err)
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyArrowUp, gocui.ModNone, actionViewConnectionsUp); err != nil {
-		log.Panicln(err)
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyArrowDown, gocui.ModNone, actionViewConnectionsDown); err != nil {
-		log.Panicln(err)
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyEnter, gocui.ModNone, actionEnterKey); err != nil {
-		log.Panicln(err)
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, actionEnterKey); err != nil {
-		log.Panicln(err)
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, actionArrowLeftKey); err != nil {
-		log.Panicln(err)
+	for _, key := range keys {
+		if err := g.SetKeybinding(key.viewname, key.key, gocui.ModNone, key.handler); err != nil {
+			panic(fmt.Sprintf("could not set key bindings: %s\n", err.Error()))
+		}
 	}
 
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
-		log.Panicln(err)
+		panic(fmt.Sprintf("received error in main loop: %s\n", err.Error()))
 	}
 }
 
@@ -63,12 +59,10 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 
-		// Settings
 		v.Frame = false
 		v.BgColor = gocui.ColorDefault | gocui.AttrReverse
 		v.FgColor = gocui.ColorDefault | gocui.AttrReverse
 
-		// Content
 		fmt.Fprintln(v, "⣿ NetPeek")
 	}
 
@@ -77,7 +71,6 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 
-		// Settings
 		v.Frame = false
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorGreen
@@ -88,7 +81,6 @@ func layout(g *gocui.Gui) error {
 		fmt.Fprintln(v, strings.Repeat("─", maxX))
 
 		g.SetCurrentView(v.Name())
-		// go viewConnectionsWithAutoRefresh(g)
 	}
 
 	if v, err := g.SetView("status", -1, maxY-2, maxX, maxY); err != nil {
@@ -96,20 +88,12 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 
-		// Settings
 		v.Frame = false
 		v.BgColor = gocui.ColorBlack
 		v.FgColor = gocui.ColorWhite
 
-		// Content
 		updateStatus(g, "C")
 	}
-
-	return nil
-}
-
-func quit(g *gocui.Gui, v *gocui.View) error {
-	os.Exit(0)
 	return nil
 }
 
