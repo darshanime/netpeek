@@ -6,8 +6,12 @@ import (
 	"strings"
 
 	"github.com/jroimartin/gocui"
-	"github.com/willf/pad"
 )
+
+func actionGlobalQuit(g *gocui.Gui, v *gocui.View) error {
+	os.Exit(0)
+	return nil
+}
 
 func actionEnterKey(g *gocui.Gui, v *gocui.View) error {
 	if v.Name() == "conns" {
@@ -55,36 +59,13 @@ func actionArrowLeftKey(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func updateStatus(g *gocui.Gui, c string) error {
-	lMaxX, _ := g.Size()
-	v, err := g.View("status")
-	if err != nil {
-		return err
-	}
+func actionGlobalArrowDown(g *gocui.Gui, v *gocui.View) error {
+	moveViewCursorDown(g, v, false)
+	return nil
+}
 
-	v.Clear()
-
-	i := lMaxX + 4
-	b := ""
-
-	switch c {
-	case "C":
-		i = 150 + i
-		b = b + frameText("↑") + " Up   "
-		b = b + frameText("↓") + " Down   "
-		b = b + frameText("Enter") + " View Requests   "
-	case "RL":
-		i = i + 100
-		b = b + frameText("←") + " Back   "
-		b = b + frameText("↑") + " Up   "
-		b = b + frameText("↓") + " Down   "
-		b = b + frameText("Enter") + " View Details   "
-	case "RD":
-		i = i + 100
-		b = b + frameText("←") + " Back   "
-	}
-	b = b + frameText("CTRL+C") + " Exit"
-	fmt.Fprintln(v, pad.Right(b, i, " "))
+func actionGlobalArrowUp(g *gocui.Gui, v *gocui.View) error {
+	moveViewCursorUp(g, v, 2)
 	return nil
 }
 
@@ -138,4 +119,47 @@ func getConnectionNameFromLine(line string) string {
 func getRequestNumberFromLine(line string) string {
 	splitLine := strings.Split(line, " ")
 	return splitLine[0]
+}
+
+func moveViewCursorUp(g *gocui.Gui, v *gocui.View, dY int) error {
+	ox, oy := v.Origin()
+	cx, cy := v.Cursor()
+	if cy > dY {
+		if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
+			if err := v.SetOrigin(ox, oy-1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func moveViewCursorDown(g *gocui.Gui, v *gocui.View, allowEmpty bool) error {
+	cx, cy := v.Cursor()
+	ox, oy := v.Origin()
+	nextLine, err := getNextViewLine(g, v)
+	if err != nil {
+		return err
+	}
+	if !allowEmpty && nextLine == "" {
+		return nil
+	}
+	if err := v.SetCursor(cx, cy+1); err != nil {
+		if err := v.SetOrigin(ox, oy+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getNextViewLine(g *gocui.Gui, v *gocui.View) (string, error) {
+	var l string
+	var err error
+
+	_, cy := v.Cursor()
+	if l, err = v.Line(cy + 1); err != nil {
+		l = ""
+	}
+
+	return l, err
 }

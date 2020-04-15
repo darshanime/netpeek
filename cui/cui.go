@@ -77,7 +77,7 @@ func layout(g *gocui.Gui) error {
 		v.SelFgColor = gocui.ColorBlack
 		v.SetCursor(0, 2)
 
-		viewConnsAddLine(v, "SRC", "DST")
+		addLineToViewConns(v, "SRC", "DST")
 		fmt.Fprintln(v, strings.Repeat("─", maxX))
 
 		g.SetCurrentView(v.Name())
@@ -97,61 +97,16 @@ func layout(g *gocui.Gui) error {
 	return nil
 }
 
-func viewConnsAddLine(v *gocui.View, src, dst string) {
+func addLineToViewConns(v *gocui.View, src, dst string) {
 	line := pad.Right(src, 30, " ") + pad.Right(dst, 30, " ")
 	fmt.Fprintln(v, line)
 }
 
-// StringFormatBoth fg and bg colors
-// Thanks https://github.com/mephux/komanda-cli/blob/master/komanda/color/color.go
+// credits: https://github.com/mephux/komanda-cli/blob/master/komanda/color/color.go
 func stringFormatBoth(fg, bg int, str string, args []string) string {
 	return fmt.Sprintf("\x1b[48;5;%dm\x1b[38;5;%d;%sm%s\x1b[0m", bg, fg, strings.Join(args, ";"), str)
 }
 
-// Frame text with colors
 func frameText(text string) string {
 	return stringFormatBoth(15, 0, text, []string{"1"})
-}
-
-func moveViewCursorUp(g *gocui.Gui, v *gocui.View, dY int) error {
-	ox, oy := v.Origin()
-	cx, cy := v.Cursor()
-	if cy > dY {
-		if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
-			if err := v.SetOrigin(ox, oy-1); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func moveViewCursorDown(g *gocui.Gui, v *gocui.View, allowEmpty bool) error {
-	cx, cy := v.Cursor()
-	ox, oy := v.Origin()
-	nextLine, err := getNextViewLine(g, v)
-	if err != nil {
-		return err
-	}
-	if !allowEmpty && nextLine == "" {
-		return nil
-	}
-	if err := v.SetCursor(cx, cy+1); err != nil {
-		if err := v.SetOrigin(ox, oy+1); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func getNextViewLine(g *gocui.Gui, v *gocui.View) (string, error) {
-	var l string
-	var err error
-
-	_, cy := v.Cursor()
-	if l, err = v.Line(cy + 1); err != nil {
-		l = ""
-	}
-
-	return l, err
 }
