@@ -21,16 +21,17 @@ type Protocol int
 
 var output *os.File
 
-const (
-	HTTP Protocol = iota
-	HTTPS
-	Unknown
-)
-
 type HTTPStreamFactory struct {
 	UseCui   *bool
-	HTTPPort *string
+	Protocol *string
+	Quiet    *bool
 }
+
+const (
+	HTTP Protocol = iota
+	Dump
+	Drain
+)
 
 type httpReader struct {
 	isClient bool
@@ -87,9 +88,11 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	fmt.Fprintln(output, fmt.Sprintf("\nclosing old connection, %s\n", connDir(h.netFlow, h.transportFlow)))
+	fmt.Fprintf(output, fmt.Sprintf("\nclosing old connection, %s\n", connDir(h.netFlow, h.transportFlow)))
 	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
 		print.Response2(nil, nil, h.stats.packets)
+		h.clientReader.stream.stats = streamStats{}
+		h.serverReader.stream.stats = streamStats{}
 	}
 	return false
 }
@@ -133,14 +136,14 @@ func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP,
 		serverReader:  httpReader{bytes: make(chan []byte), isClient: false},
 		useCui:        h.UseCui,
 	}
-	if *h.UseCui {
+	if *h.UseCui || *h.Quiet {
 		output = os.Stderr
 	} else {
 		output = os.Stdout
 	}
 	stream.clientReader.stream = stream
 	stream.serverReader.stream = stream
-	stream.protocol = getProtocol(stream, *h.HTTPPort)
+	stream.protocol = getProtocol(*h.Protocol)
 	go stream.clientReader.read()
 	go stream.serverReader.read()
 	return stream
@@ -150,15 +153,15 @@ func (h *httpReader) read() {
 	switch h.stream.protocol {
 	case HTTP:
 		if h.isClient {
-			fmt.Fprintln(output, "starting http request reader")
+			fmt.Fprintf(output, "starting http request reader\n")
 			go readHTTPRequest(h)
 		} else {
-			fmt.Fprintln(output, "starting http response reader")
+			fmt.Fprintf(output, "starting http response reader\n")
 			go readHTTPResponse(h)
 		}
-	case HTTPS:
+	case Drain:
 		go drainPackets(h)
-	case Unknown:
+	case Dump:
 		go dumpPackets(h)
 	}
 }
@@ -169,10 +172,10 @@ func readHTTPResponse(h *httpReader) {
 		resp, err := http.ReadResponse(buf, h.stream.request)
 		fmt.Fprintf(output, "read response %v\n", err)
 		if err == io.EOF {
-			fmt.Fprintln(output, "stopped reading response, got EOF, %s\n", err.Error())
+			fmt.Fprintf(output, "stopped reading response, got EOF, %s\n", err.Error())
 			return
 		} else if err != nil {
-			fmt.Fprintln(output, "cannot read response, %s\n", err.Error())
+			fmt.Fprintf(output, "cannot read response, %s\n", err.Error())
 		} else {
 			if *h.stream.useCui {
 				cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, h.stream.request, resp, h.stream.stats.packets)
@@ -190,30 +193,14 @@ func readHTTPRequest(h *httpReader) {
 		req, err := http.ReadRequest(buf)
 		fmt.Fprintf(output, "read request %v\n", err)
 		if err == io.EOF {
-			fmt.Fprintln(output, "stopped reading request, got EOF, %s\n", err.Error())
+			fmt.Fprintf(output, "stopped reading request, got EOF, %s\n", err.Error())
 			return
 		} else if err != nil {
-			fmt.Fprintln(output, "cannot read request, %s\n", err.Error())
+			fmt.Fprintf(output, "cannot read request, %s\n", err.Error())
 		} else {
 			h.stream.request = req
 		}
 	}
-}
-
-func getProtocol(h *httpStream, appPort string) Protocol {
-	src, dst := h.transportFlow.Dst().String(), h.transportFlow.Src().String()
-
-	if src == appPort || dst == appPort {
-		fmt.Fprintf(output, fmt.Sprintf("\nadding new protocol, http\n"))
-		return HTTP
-	}
-
-	if src == "443" || dst == "443" {
-		fmt.Fprintf(output, fmt.Sprintf("\nadding new protocol, https\n"))
-		return HTTPS
-	}
-	fmt.Fprintf(output, fmt.Sprintf("\nadding new protocol, unknown\n"))
-	return Unknown
 }
 
 func drainPackets(h *httpReader) {
@@ -223,8 +210,8 @@ func drainPackets(h *httpReader) {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
 				print.Response2(nil, nil, h.stream.stats.packets)
+				h.stream.stats = streamStats{}
 			}
-			h.stream.stats = streamStats{}
 		}
 	}
 }
@@ -245,4 +232,17 @@ func dumpPackets(h *httpReader) {
 
 func connDir(netflow, tcpflow gopacket.Flow) string {
 	return netflow.Src().String() + ":" + tcpflow.Src().String() + "-->" + netflow.Dst().String() + ":" + tcpflow.Dst().String()
+}
+
+func getProtocol(protocol string) Protocol {
+	switch protocol {
+	case "http":
+		return HTTP
+	case "drain":
+	case "https":
+		return Drain
+	case "dump":
+		return Dump
+	}
+	panic(fmt.Sprintf("unknown protocol: %s", protocol))
 }
