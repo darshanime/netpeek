@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	"github.com/darshanime/netpeek/cui"
@@ -26,25 +24,26 @@ var quiet = flag.Bool("q", false, "quiet mode")
 
 func main() {
 	flag.Parse()
-	fmt.Printf("pcap version: %s\n", pcap.Version())
-	fmt.Printf("iface: %s\n", *iface)
-	fmt.Printf("useCui: %t\n", *useCui)
-	fmt.Printf("sPort: %s\n", *sPort)
-	fmt.Printf("dPort: %s\n", *dPort)
-	fmt.Printf("sHost: %s\n", *sHost)
-	fmt.Printf("dHost: %s\n", *dHost)
-	fmt.Printf("protocol: %s\n", *protocol)
-	fmt.Printf("quiet: %t\n", *quiet)
-	fmt.Printf("bpf: %s\n", getBPFProgram())
+	logger := getLogger(quiet, useCui)
+	logger.Printf("pcap version: %s\n", pcap.Version())
+	logger.Printf("iface: %s\n", *iface)
+	logger.Printf("useCui: %t\n", *useCui)
+	logger.Printf("sPort: %s\n", *sPort)
+	logger.Printf("dPort: %s\n", *dPort)
+	logger.Printf("sHost: %s\n", *sHost)
+	logger.Printf("dHost: %s\n", *dHost)
+	logger.Printf("protocol: %s\n", *protocol)
+	logger.Printf("quiet: %t\n", *quiet)
+	logger.Printf("bpf: %s\n", getBPFProgram())
 
 	handle, err := pcap.OpenLive(*iface, int32(65535), true, pcap.BlockForever)
 	if err != nil {
-		panic(fmt.Sprintf("cannot open %s interface for sniffing", *iface))
+		logger.Panic(fmt.Sprintf("cannot open %s interface for sniffing", *iface))
 	}
 	defer handle.Close()
 	err = handle.SetBPFFilter(getBPFProgram())
 	if err != nil {
-		panic("incorrect bpf program")
+		logger.Panic("incorrect bpf program")
 	}
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
@@ -61,14 +60,14 @@ func main() {
 		select {
 		case packet := <-packets:
 			if !*useCui && !*quiet {
-				fmt.Fprintf(os.Stdout, "#")
+				logger.Printf("#")
 			}
 
 			if packet == nil {
 				return
 			}
 			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
-				log.Println("Unusable packet")
+				logger.Printf("Unusable packet")
 				continue
 			}
 			tcp := packet.TransportLayer().(*layers.TCP)
