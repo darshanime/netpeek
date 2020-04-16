@@ -223,7 +223,7 @@ func dumpPackets(h *httpReader) {
 		select {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
-				io.Copy(output, buf)
+				io.CopyN(h.stream.logger.Writer(), buf, int64(buf.Size()))
 			}
 			h.stream.stats = streamStats{}
 		}
