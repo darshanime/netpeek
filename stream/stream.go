@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/darshanime/netpeek/cui"
@@ -19,12 +19,11 @@ import (
 
 type Protocol int
 
-var output *os.File
-
 type HTTPStreamFactory struct {
 	UseCui   *bool
 	Protocol *string
 	Quiet    *bool
+	Logger   *log.Logger
 }
 
 const (
@@ -49,6 +48,7 @@ type httpStream struct {
 	stats         streamStats
 	useCui        *bool
 	protocol      Protocol
+	logger        *log.Logger
 }
 
 type streamStats struct {
@@ -88,9 +88,13 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	fmt.Fprintf(output, fmt.Sprintf("\nclosing old connection, %s\n", connDir(h.netFlow, h.transportFlow)))
+	h.logger.Printf(fmt.Sprintf("closing old connection, %s", connDir(h.netFlow, h.transportFlow)))
 	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
-		print.Response2(nil, nil, h.stats.packets)
+		if *h.useCui {
+			cui.AddRequest(h.netFlow, h.transportFlow, nil, nil, h.stats.packets)
+		} else {
+			print.Response(nil, nil, h.stats.packets)
+		}
 		h.clientReader.stream.stats = streamStats{}
 		h.serverReader.stream.stats = streamStats{}
 	}
@@ -124,22 +128,14 @@ func (h *httpReader) Read(p []byte) (int, error) {
 
 // New is required to statisfy the StreamFactory inferface
 func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
-	if *h.UseCui {
-		cui.AddConnection(netFlow, tcpFlow)
-	} else {
-		fmt.Fprintf(output, fmt.Sprintf("\nadding new connection, %s\n", connDir(netFlow, tcpFlow)))
-	}
+	h.Logger.Printf(fmt.Sprintf("\nadding new connection, %s", connDir(netFlow, tcpFlow)))
 	stream := &httpStream{
 		netFlow:       netFlow,
 		transportFlow: tcpFlow,
 		clientReader:  httpReader{bytes: make(chan []byte), isClient: true},
 		serverReader:  httpReader{bytes: make(chan []byte), isClient: false},
 		useCui:        h.UseCui,
-	}
-	if *h.UseCui || *h.Quiet {
-		output = os.Stderr
-	} else {
-		output = os.Stdout
+		logger:        h.Logger,
 	}
 	stream.clientReader.stream = stream
 	stream.serverReader.stream = stream
@@ -153,10 +149,10 @@ func (h *httpReader) read() {
 	switch h.stream.protocol {
 	case HTTP:
 		if h.isClient {
-			fmt.Fprintf(output, "starting http request reader\n")
+			h.stream.logger.Printf("starting http request reader")
 			go readHTTPRequest(h)
 		} else {
-			fmt.Fprintf(output, "starting http response reader\n")
+			h.stream.logger.Printf("starting http response reader")
 			go readHTTPResponse(h)
 		}
 	case Drain:
@@ -170,17 +166,17 @@ func readHTTPResponse(h *httpReader) {
 	buf := bufio.NewReader(h)
 	for {
 		resp, err := http.ReadResponse(buf, h.stream.request)
-		fmt.Fprintf(output, "read response %v\n", err)
+		h.stream.logger.Printf("read response %v", err)
 		if err == io.EOF {
-			fmt.Fprintf(output, "stopped reading response, got EOF, %s\n", err.Error())
+			h.stream.logger.Printf("stopped reading response, got EOF, %s", err.Error())
 			return
 		} else if err != nil {
-			fmt.Fprintf(output, "cannot read response, %s\n", err.Error())
+			h.stream.logger.Printf("cannot read response, %s", err.Error())
 		} else {
 			if *h.stream.useCui {
 				cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, h.stream.request, resp, h.stream.stats.packets)
 			} else {
-				print.Response2(h.stream.request, resp, h.stream.stats.packets)
+				print.Response(h.stream.request, resp, h.stream.stats.packets)
 				h.stream.stats = streamStats{}
 			}
 		}
@@ -191,12 +187,12 @@ func readHTTPRequest(h *httpReader) {
 	buf := bufio.NewReader(h)
 	for {
 		req, err := http.ReadRequest(buf)
-		fmt.Fprintf(output, "read request %v\n", err)
+		h.stream.logger.Printf(fmt.Sprintf("read request %v", err))
 		if err == io.EOF {
-			fmt.Fprintf(output, "stopped reading request, got EOF, %s\n", err.Error())
+			h.stream.logger.Printf(fmt.Sprintf("stopped reading request, got EOF, %s", err.Error()))
 			return
 		} else if err != nil {
-			fmt.Fprintf(output, "cannot read request, %s\n", err.Error())
+			h.stream.logger.Printf(fmt.Sprintf("cannot read request, %s", err.Error()))
 		} else {
 			h.stream.request = req
 		}
@@ -209,7 +205,11 @@ func drainPackets(h *httpReader) {
 		select {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
-				print.Response2(nil, nil, h.stream.stats.packets)
+				if *h.stream.useCui {
+					cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, nil, nil, h.stream.stats.packets)
+				} else {
+					print.Response(nil, nil, h.stream.stats.packets)
+				}
 				h.stream.stats = streamStats{}
 			}
 		}
