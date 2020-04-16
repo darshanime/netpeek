@@ -1,7 +1,6 @@
 package cui
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -19,10 +18,10 @@ func actionEnterKey(g *gocui.Gui, v *gocui.View) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stderr, "setting on top: "+"reqs->list"+conn)
 		updateStatus(g, "RL")
 		g.SetCurrentView("reqs->list" + conn)
 		g.SetViewOnTop("reqs->list" + conn)
+		logger.Printf("setting on top: " + "reqs->list" + conn)
 		return nil
 	} else if strings.Contains(v.Name(), "reqs->list") {
 		conn, err := getSelectedRequest()
@@ -36,7 +35,7 @@ func actionEnterKey(g *gocui.Gui, v *gocui.View) error {
 		g.SetViewOnTop(conn + "->resp")
 		g.SetCurrentView(conn + "->req")
 		g.SetViewOnTop(conn + "->req")
-		fmt.Fprintln(os.Stderr, "setting on top: "+conn+"->pkt")
+		logger.Printf("setting on top: " + conn + "->pkt")
 		return nil
 	}
 	return nil
@@ -51,9 +50,9 @@ func actionArrowLeftKey(g *gocui.Gui, v *gocui.View) error {
 	} else if strings.Contains(v.Name(), "req->detail") {
 		splitReqList := strings.Split(v.Name(), "->")
 		recListViewName := "reqs->list->" + splitReqList[3] + "->" + splitReqList[4]
-		fmt.Fprintln(os.Stderr, "trying to go back: "+recListViewName)
 		g.SetCurrentView(recListViewName)
 		g.SetViewOnTop(recListViewName)
+		logger.Printf("trying to go back: " + recListViewName)
 		return nil
 	}
 	return nil
@@ -108,9 +107,14 @@ func getViewLine(g *gocui.Gui, v *gocui.View) (string, error) {
 func getConnectionNameFromLine(line string) string {
 	splitLine := strings.Split(line, " ")
 	result := ""
+	numSkipped := false
 	for _, substr := range splitLine {
 		if substr != "" {
-			result += "->" + substr
+			if numSkipped {
+				result += "->" + substr
+			} else {
+				numSkipped = true
+			}
 		}
 	}
 	return result
