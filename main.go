@@ -25,16 +25,16 @@ var quiet = flag.Bool("q", false, "quiet mode")
 func main() {
 	flag.Parse()
 	logger := getLogger(quiet, useCui)
-	logger.Printf("pcap version: %s\n", pcap.Version())
-	logger.Printf("iface: %s\n", *iface)
-	logger.Printf("useCui: %t\n", *useCui)
-	logger.Printf("sPort: %s\n", *sPort)
-	logger.Printf("dPort: %s\n", *dPort)
-	logger.Printf("sHost: %s\n", *sHost)
-	logger.Printf("dHost: %s\n", *dHost)
-	logger.Printf("protocol: %s\n", *protocol)
-	logger.Printf("quiet: %t\n", *quiet)
-	logger.Printf("bpf: %s\n", getBPFProgram())
+	logger.Printf("pcap version: %s", pcap.Version())
+	logger.Printf("iface: %s", *iface)
+	logger.Printf("useCui: %t", *useCui)
+	logger.Printf("sPort: %s", *sPort)
+	logger.Printf("dPort: %s", *dPort)
+	logger.Printf("sHost: %s", *sHost)
+	logger.Printf("dHost: %s", *dHost)
+	logger.Printf("protocol: %s", *protocol)
+	logger.Printf("quiet: %t", *quiet)
+	logger.Printf("bpf: %s", getBPFProgram())
 
 	handle, err := pcap.OpenLive(*iface, int32(65535), true, pcap.BlockForever)
 	if err != nil {
@@ -47,20 +47,21 @@ func main() {
 	}
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
-	streamFactory := &stream.HTTPStreamFactory{UseCui: useCui, Protocol: protocol, Quiet: quiet}
+	streamFactory := &stream.HTTPStreamFactory{UseCui: useCui, Protocol: protocol, Quiet: quiet, Logger: logger}
 	streamPool := reassembly.NewStreamPool(streamFactory)
 	assembler := reassembly.NewAssembler(streamPool)
 
 	packets := packetSource.Packets()
 	ticker := time.Tick(time.Minute)
 	if *useCui {
-		go cui.InitCui()
+		go cui.InitCui(logger)
 	}
 	for {
 		select {
 		case packet := <-packets:
+			// logger adds new lines mandatorily - see golang/go/issues/16564
 			if !*useCui && !*quiet {
-				logger.Printf("#")
+				fmt.Printf("#")
 			}
 
 			if packet == nil {
