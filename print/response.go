@@ -9,7 +9,7 @@ import (
 	"github.com/darshanime/netpeek/stats"
 )
 
-func Response2(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
+func Response(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
 	var reqStr, respStr, pktStr string
 	if req != nil {
 		reqStr = cui.RequestToString(req)

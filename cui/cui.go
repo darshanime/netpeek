@@ -2,14 +2,15 @@ package cui
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/jroimartin/gocui"
-	"github.com/willf/pad"
 )
 
 var g *gocui.Gui
+var logger *log.Logger
 
 var connMap map[gopacket.Flow]int
 
@@ -28,7 +29,8 @@ var keys []Key = []Key{
 	Key{"", gocui.KeyArrowLeft, actionArrowLeftKey},
 }
 
-func InitCui() {
+func InitCui(guiLogger *log.Logger) {
+	logger = guiLogger
 	gui, err := gocui.NewGui(gocui.OutputNormal)
 	connMap = map[gopacket.Flow]int{}
 
@@ -37,6 +39,7 @@ func InitCui() {
 	}
 
 	g = gui
+	g.Mouse = true
 
 	g.SetManagerFunc(layout)
 
@@ -77,7 +80,7 @@ func layout(g *gocui.Gui) error {
 		v.SelFgColor = gocui.ColorBlack
 		v.SetCursor(0, 2)
 
-		addLineToViewConns(v, "SRC", "DST")
+		addLineToViewConns(v, "SNo", "SRC", "DST")
 		fmt.Fprintln(v, strings.Repeat("─", maxX))
 
 		g.SetCurrentView(v.Name())
@@ -95,11 +98,6 @@ func layout(g *gocui.Gui) error {
 		updateStatus(g, "C")
 	}
 	return nil
-}
-
-func addLineToViewConns(v *gocui.View, src, dst string) {
-	line := pad.Right(src, 30, " ") + pad.Right(dst, 30, " ")
-	fmt.Fprintln(v, line)
 }
 
 // credits: https://github.com/mephux/komanda-cli/blob/master/komanda/color/color.go

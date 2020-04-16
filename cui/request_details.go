@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/darshanime/netpeek/stats"
@@ -13,13 +12,13 @@ import (
 
 func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo, name string) {
 	maxX, maxY := g.Size()
-	fmt.Fprintln(os.Stderr, "creating: "+"req->detail->"+name+"->req")
 
 	reqDetailName := "req->detail->" + name + "->req"
 	respDetailName := "req->detail->" + name + "->resp"
 	pktDetailName := "req->detail->" + name + "->pkt"
 
 	// setting the request view
+	logger.Printf("creating: " + "req->detail->" + name + "->req")
 	v, err := g.SetView(reqDetailName, -1, 1, maxX/3, maxY-2)
 	if err != nil {
 		if err != gocui.ErrUnknownView {
@@ -27,28 +26,29 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 		}
 		v.Autoscroll = false
 		v.Frame = true
+		v.Wrap = true
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(reqDetailName)
 	fmt.Fprintln(v, RequestToString(req))
 
 	// setting the response view
-	fmt.Fprintln(os.Stderr, "creating: "+respDetailName)
+	logger.Printf("creating: " + respDetailName)
 	v, err = g.SetView(respDetailName, maxX/3, 1, 2*maxX/3, maxY-2)
 	if err != nil {
 		if err != gocui.ErrUnknownView {
 			panic("panic in set view")
 		}
-
 		v.Autoscroll = false
 		v.Frame = true
+		v.Wrap = true
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(respDetailName)
 	fmt.Fprintln(v, ResponseToString(resp))
 
 	// setting the packets view
-	fmt.Fprintln(os.Stderr, "creating: "+pktDetailName)
+	logger.Printf("creating: " + pktDetailName)
 	v, err = g.SetView(pktDetailName, 2*maxX/3, 1, maxX, maxY-2)
 	if err != nil {
 		if err != gocui.ErrUnknownView {
@@ -56,14 +56,11 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 		}
 		v.Autoscroll = false
 		v.Frame = true
+		v.Wrap = true
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(pktDetailName)
 	fmt.Fprintln(v, PacketsToString(pktInfo))
-}
-
-func getRequestDetailView(req *http.Request, suffix string) string {
-	return req.URL.String() + suffix
 }
 
 func RequestToString(req *http.Request) string {
@@ -84,6 +81,7 @@ func RequestToString(req *http.Request) string {
 
 func ResponseToString(resp *http.Response) string {
 	var str strings.Builder
+	str.WriteString("Response code: " + resp.Status + "\n")
 	for key, val := range resp.Header {
 		str.WriteString(key + ": " + strings.Join(val, ",") + "\n")
 	}
