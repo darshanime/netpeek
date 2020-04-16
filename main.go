@@ -20,11 +20,11 @@ var dPort = flag.String("dport", "", "destination port")
 var sHost = flag.String("shost", "", "source host port")
 var dHost = flag.String("dhost", "", "destination port")
 var protocol = flag.String("protocol", "http", "protocol to parse for")
-var quiet = flag.Bool("q", false, "quiet mode")
+var verbose = flag.Bool("v", false, "verbose mode")
 
 func main() {
 	flag.Parse()
-	logger := getLogger(quiet, useCui)
+	logger := getLogger(verbose, useCui)
 	logger.Printf("pcap version: %s", pcap.Version())
 	logger.Printf("iface: %s", *iface)
 	logger.Printf("useCui: %t", *useCui)
@@ -33,21 +33,21 @@ func main() {
 	logger.Printf("sHost: %s", *sHost)
 	logger.Printf("dHost: %s", *dHost)
 	logger.Printf("protocol: %s", *protocol)
-	logger.Printf("quiet: %t", *quiet)
+	logger.Printf("verbose: %t", *verbose)
 	logger.Printf("bpf: %s", getBPFProgram())
 
 	handle, err := pcap.OpenLive(*iface, int32(65535), true, pcap.BlockForever)
 	if err != nil {
-		logger.Panic(fmt.Sprintf("cannot open %s interface for sniffing", *iface))
+		panic(fmt.Sprintf("cannot open %s interface for sniffing", *iface))
 	}
 	defer handle.Close()
 	err = handle.SetBPFFilter(getBPFProgram())
 	if err != nil {
-		logger.Panic("incorrect bpf program")
+		panic("incorrect bpf program")
 	}
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
-	streamFactory := &stream.HTTPStreamFactory{UseCui: useCui, Protocol: protocol, Quiet: quiet, Logger: logger}
+	streamFactory := &stream.HTTPStreamFactory{UseCui: useCui, Protocol: protocol, Logger: logger}
 	streamPool := reassembly.NewStreamPool(streamFactory)
 	assembler := reassembly.NewAssembler(streamPool)
 
@@ -60,7 +60,7 @@ func main() {
 		select {
 		case packet := <-packets:
 			// logger adds new lines mandatorily - see golang/go/issues/16564
-			if !*useCui && !*quiet {
+			if !*useCui && *verbose {
 				fmt.Printf("#")
 			}
 

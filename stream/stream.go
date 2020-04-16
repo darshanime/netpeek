@@ -22,7 +22,6 @@ type Protocol int
 type HTTPStreamFactory struct {
 	UseCui   *bool
 	Protocol *string
-	Quiet    *bool
 	Logger   *log.Logger
 }
 

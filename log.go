@@ -6,12 +6,9 @@ import (
 	"os"
 )
 
-func getLogger(quiet, cui *bool) *log.Logger {
-	if *cui {
+func getLogger(verbose, cui *bool) *log.Logger {
+	if *cui || !*verbose {
 		return log.New(ioutil.Discard, "", 0)
-	}
-	if *quiet {
-		return log.New(os.Stderr, "", 0)
 	}
 	return log.New(os.Stdout, "", 0)
 }
