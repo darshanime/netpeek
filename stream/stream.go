@@ -88,7 +88,7 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	h.logger.Printf(fmt.Sprintf("closing old connection, %s", connDir(h.netFlow, h.transportFlow)))
+	h.logger.Printf("closing old connection, %s", connDir(h.netFlow, h.transportFlow))
 	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
 		if *h.useCui {
 			cui.AddRequest(h.netFlow, h.transportFlow, nil, nil, h.stats.packets)
@@ -128,7 +128,7 @@ func (h *httpReader) Read(p []byte) (int, error) {
 
 // New is required to statisfy the StreamFactory inferface
 func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
-	h.Logger.Printf(fmt.Sprintf("\nadding new connection, %s", connDir(netFlow, tcpFlow)))
+	h.Logger.Printf("\nadding new connection, %s", connDir(netFlow, tcpFlow))
 	stream := &httpStream{
 		netFlow:       netFlow,
 		transportFlow: tcpFlow,
@@ -187,12 +187,12 @@ func readHTTPRequest(h *httpReader) {
 	buf := bufio.NewReader(h)
 	for {
 		req, err := http.ReadRequest(buf)
-		h.stream.logger.Printf(fmt.Sprintf("read request %v", err))
+		h.stream.logger.Printf("read request %v", err)
 		if err == io.EOF {
-			h.stream.logger.Printf(fmt.Sprintf("stopped reading request, got EOF, %s", err.Error()))
+			h.stream.logger.Printf("stopped reading request, got EOF, %s", err.Error())
 			return
 		} else if err != nil {
-			h.stream.logger.Printf(fmt.Sprintf("cannot read request, %s", err.Error()))
+			h.stream.logger.Printf("cannot read request, %s", err.Error())
 		} else {
 			h.stream.request = req
 		}
