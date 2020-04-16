@@ -89,11 +89,7 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
 	h.logger.Printf("closing old connection, %s", connDir(h.netFlow, h.transportFlow))
 	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
-		if *h.useCui {
-			cui.AddRequest(h.netFlow, h.transportFlow, nil, nil, h.stats.packets)
-		} else {
-			print.Response(nil, nil, h.stats.packets)
-		}
+		h.outputRequest(nil)
 		h.clientReader.stream.stats = streamStats{}
 		h.serverReader.stream.stats = streamStats{}
 	}
@@ -155,8 +151,10 @@ func (h *httpReader) read() {
 			go readHTTPResponse(h)
 		}
 	case Drain:
+		h.stream.logger.Printf("starting to drain packets")
 		go drainPackets(h)
 	case Dump:
+		h.stream.logger.Printf("starting to dump packets")
 		go dumpPackets(h)
 	}
 }
@@ -172,12 +170,7 @@ func readHTTPResponse(h *httpReader) {
 		} else if err != nil {
 			h.stream.logger.Printf("cannot read response, %s", err.Error())
 		} else {
-			if *h.stream.useCui {
-				cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, h.stream.request, resp, h.stream.stats.packets)
-			} else {
-				print.Response(h.stream.request, resp, h.stream.stats.packets)
-				h.stream.stats = streamStats{}
-			}
+			h.stream.outputRequest(resp)
 		}
 	}
 }
@@ -204,12 +197,7 @@ func drainPackets(h *httpReader) {
 		select {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
-				if *h.stream.useCui {
-					cui.AddRequest(h.stream.netFlow, h.stream.transportFlow, nil, nil, h.stream.stats.packets)
-				} else {
-					print.Response(nil, nil, h.stream.stats.packets)
-				}
-				h.stream.stats = streamStats{}
+				h.stream.outputRequest(nil)
 			}
 		}
 	}
@@ -217,7 +205,7 @@ func drainPackets(h *httpReader) {
 
 func dumpPackets(h *httpReader) {
 	buf := bufio.NewReader(h)
-	ticker := time.Tick(5 * time.Second)
+	ticker := time.Tick(1 * time.Second)
 	for {
 		select {
 		case <-ticker:
@@ -238,10 +226,20 @@ func getProtocol(protocol string) Protocol {
 	case "http":
 		return HTTP
 	case "drain":
+		return Drain
 	case "https":
 		return Drain
 	case "dump":
 		return Dump
 	}
 	panic(fmt.Sprintf("unknown protocol: %s", protocol))
+}
+
+func (h *httpStream) outputRequest(resp *http.Response) {
+	if *h.useCui {
+		cui.AddRequest(h.netFlow, h.transportFlow, h.request, resp, h.stats.packets)
+	} else {
+		print.Response(h.request, resp, h.stats.packets)
+	}
+	h.stats = streamStats{}
 }
