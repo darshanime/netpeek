@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/darshanime/netpeek/cui"
@@ -192,27 +194,27 @@ func readHTTPRequest(h *httpReader) {
 }
 
 func drainPackets(h *httpReader) {
-	ticker := time.Tick(5 * time.Second)
+	go io.Copy(ioutil.Discard, h)
+	ticker := time.Tick(1 * time.Second)
 	for {
 		select {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
-				h.stream.outputRequest(nil)
+				fmt.Printf(cui.PacketsToString(h.stream.stats.packets) + "\n")
+				h.stream.stats.packets = nil
 			}
 		}
 	}
 }
 
 func dumpPackets(h *httpReader) {
-	buf := bufio.NewReader(h)
+	go io.Copy(os.Stdout, h)
 	ticker := time.Tick(1 * time.Second)
 	for {
 		select {
 		case <-ticker:
-			if len(h.stream.stats.packets) != 0 {
-				io.CopyN(h.stream.logger.Writer(), buf, int64(buf.Size()))
-			}
-			h.stream.stats = streamStats{}
+			h.stream.logger.Printf(cui.PacketsToString(h.stream.stats.packets))
+			h.stream.stats.packets = nil
 		}
 	}
 }
@@ -241,5 +243,5 @@ func (h *httpStream) outputRequest(resp *http.Response) {
 	} else {
 		print.Response(h.request, resp, h.stats.packets)
 	}
-	h.stats = streamStats{}
+	h.stats.packets = nil
 }
