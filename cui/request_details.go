@@ -2,10 +2,9 @@ package cui
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"strings"
 
+	"github.com/darshanime/netpeek/print"
 	"github.com/darshanime/netpeek/stats"
 	"github.com/jroimartin/gocui"
 )
@@ -30,7 +29,7 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(reqDetailName)
-	fmt.Fprintln(v, RequestToString(req))
+	fmt.Fprintln(v, print.RequestToString(req))
 
 	// setting the response view
 	logger.Printf("creating: " + respDetailName)
@@ -45,7 +44,7 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(respDetailName)
-	fmt.Fprintln(v, ResponseToString(resp))
+	fmt.Fprintln(v, print.ResponseToString(resp))
 
 	// setting the packets view
 	logger.Printf("creating: " + pktDetailName)
@@ -60,45 +59,5 @@ func PrintResponse(req *http.Request, resp *http.Response, pktInfo []stats.Packe
 	}
 	v.SetCursor(0, 2)
 	g.SetViewOnBottom(pktDetailName)
-	fmt.Fprintln(v, PacketsToString(pktInfo))
-}
-
-func RequestToString(req *http.Request) string {
-	var str strings.Builder
-	str.WriteString(req.Method + " " + req.URL.String() + "\n")
-	for key, val := range req.Header {
-		str.WriteString(key + ": " + strings.Join(val, ",") + "\n")
-	}
-	str.WriteString("\n")
-	rcBody, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		panic(fmt.Sprintf("cannot read resp.Body - %s\n", err.Error()))
-	}
-	defer req.Body.Close()
-	str.Write(rcBody)
-	return str.String()
-}
-
-func ResponseToString(resp *http.Response) string {
-	var str strings.Builder
-	str.WriteString("Response code: " + resp.Status + "\n")
-	for key, val := range resp.Header {
-		str.WriteString(key + ": " + strings.Join(val, ",") + "\n")
-	}
-	str.WriteString("\n")
-	rcBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(fmt.Sprintf("cannot read resp.Body - %s\n", err.Error()))
-	}
-	defer resp.Body.Close()
-	str.Write(rcBody)
-	return str.String()
-}
-
-func PacketsToString(pktInfo []stats.PacketInfo) string {
-	var str strings.Builder
-	for _, pkt := range pktInfo {
-		str.WriteString(pkt.String() + "\n")
-	}
-	return str.String()
+	fmt.Fprintln(v, print.PacketsToString(pktInfo))
 }

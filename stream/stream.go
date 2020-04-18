@@ -200,7 +200,7 @@ func drainPackets(h *httpReader) {
 		select {
 		case <-ticker:
 			if len(h.stream.stats.packets) != 0 {
-				fmt.Printf(cui.PacketsToString(h.stream.stats.packets) + "\n")
+				fmt.Printf(print.PacketsToString(h.stream.stats.packets) + "\n")
 				h.stream.stats.packets = nil
 			}
 		}
@@ -213,7 +213,7 @@ func dumpPackets(h *httpReader) {
 	for {
 		select {
 		case <-ticker:
-			h.stream.logger.Printf(cui.PacketsToString(h.stream.stats.packets))
+			h.stream.logger.Printf(print.PacketsToString(h.stream.stats.packets))
 			h.stream.stats.packets = nil
 		}
 	}
