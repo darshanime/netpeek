@@ -89,7 +89,7 @@ func (h *httpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reasse
 }
 
 func (h *httpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
-	h.logger.Printf("closing old connection, %s", connDir(h.netFlow, h.transportFlow))
+	h.logger.Printf("closing old connection, %s", print.ConnDir(h.netFlow, h.transportFlow))
 	if h.transportFlow.Src().String() == "443" || h.transportFlow.Dst().String() == "443" {
 		h.outputRequest(nil)
 		h.clientReader.stream.stats = streamStats{}
@@ -125,7 +125,7 @@ func (h *httpReader) Read(p []byte) (int, error) {
 
 // New is required to statisfy the StreamFactory inferface
 func (h *HTTPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
-	h.Logger.Printf("\nadding new connection, %s", connDir(netFlow, tcpFlow))
+	h.Logger.Printf("\nadding new connection, %s", print.ConnDir(netFlow, tcpFlow))
 	stream := &httpStream{
 		netFlow:       netFlow,
 		transportFlow: tcpFlow,
@@ -219,10 +219,6 @@ func dumpPackets(h *httpReader) {
 	}
 }
 
-func connDir(netflow, tcpflow gopacket.Flow) string {
-	return netflow.Src().String() + ":" + tcpflow.Src().String() + "-->" + netflow.Dst().String() + ":" + tcpflow.Dst().String()
-}
-
 func getProtocol(protocol string) Protocol {
 	switch protocol {
 	case "http":
@@ -239,9 +235,9 @@ func getProtocol(protocol string) Protocol {
 
 func (h *httpStream) outputRequest(resp *http.Response) {
 	if *h.useCui {
-		cui.AddRequest(h.netFlow, h.transportFlow, h.request, resp, h.stats.packets)
+		cui.Output(h.netFlow, h.transportFlow, h.request, resp, h.stats.packets)
 	} else {
-		print.Response(h.request, resp, h.stats.packets)
+		print.Output(h.request, resp, h.stats.packets)
 	}
 	h.stats.packets = nil
 }

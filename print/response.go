@@ -10,7 +10,7 @@ import (
 	"github.com/darshanime/netpeek/stats"
 )
 
-func Response(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
+func Output(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
 	var reqStr, respStr, pktStr string
 	if req != nil {
 		reqStr = RequestToString(req)
@@ -24,22 +24,6 @@ func Response(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo
 	}
 	pktStr = PacketsToString(pktInfo)
 	fmt.Fprintf(os.Stdout, "\nRequest:\n%s\nResponse:\n%s\n\nPackets:\n%s", reqStr, respStr, pktStr)
-}
-
-func RequestToString(req *http.Request) string {
-	var str strings.Builder
-	str.WriteString(req.Method + " " + req.URL.String() + "\n")
-	for key, val := range req.Header {
-		str.WriteString(key + ": " + strings.Join(val, ",") + "\n")
-	}
-	str.WriteString("\n")
-	rcBody, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		panic(fmt.Sprintf("cannot read resp.Body - %s\n", err.Error()))
-	}
-	defer req.Body.Close()
-	str.Write(rcBody)
-	return str.String()
 }
 
 func ResponseToString(resp *http.Response) string {

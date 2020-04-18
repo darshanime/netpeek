@@ -20,7 +20,7 @@ func init() {
 	requestCounter = make(map[gopacket.Flow]map[gopacket.Flow]int)
 }
 
-func AddRequest(netflow, tcpflow gopacket.Flow, req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
+func Output(netflow, tcpflow gopacket.Flow, req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) {
 	conn := getRequestName(netflow, tcpflow)
 	if req == nil {
 		logger.Printf("not creating: reqs->list" + conn)
