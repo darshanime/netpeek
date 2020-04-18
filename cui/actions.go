@@ -14,7 +14,7 @@ func actionGlobalQuit(g *gocui.Gui, v *gocui.View) error {
 
 func actionEnterKey(g *gocui.Gui, v *gocui.View) error {
 	if v.Name() == "conns" {
-		conn, err := getSelectedConnection(g)
+		conn, err := getSelectedConnection()
 		if err != nil {
 			return err
 		}
@@ -59,18 +59,18 @@ func actionArrowLeftKey(g *gocui.Gui, v *gocui.View) error {
 }
 
 func actionGlobalArrowDown(g *gocui.Gui, v *gocui.View) error {
-	moveViewCursorDown(g, v, false)
+	moveViewCursorDown(v, false)
 	return nil
 }
 
 func actionGlobalArrowUp(g *gocui.Gui, v *gocui.View) error {
-	moveViewCursorUp(g, v, 2)
+	moveViewCursorUp(v, 2)
 	return nil
 }
 
 func getSelectedRequest() (string, error) {
 	v := g.CurrentView()
-	l, err := getViewLine(g, v)
+	l, err := getViewLine(v)
 	if err != nil {
 		return "", err
 	}
@@ -79,12 +79,12 @@ func getSelectedRequest() (string, error) {
 	return "req->detail->" + number + "->" + splitReqList[2] + "->" + splitReqList[3], nil
 }
 
-func getSelectedConnection(g *gocui.Gui) (string, error) {
+func getSelectedConnection() (string, error) {
 	v, err := g.View("conns")
 	if err != nil {
 		return "", err
 	}
-	l, err := getViewLine(g, v)
+	l, err := getViewLine(v)
 	if err != nil {
 		return "", err
 	}
@@ -92,7 +92,7 @@ func getSelectedConnection(g *gocui.Gui) (string, error) {
 	return p, nil
 }
 
-func getViewLine(g *gocui.Gui, v *gocui.View) (string, error) {
+func getViewLine(v *gocui.View) (string, error) {
 	var l string
 	var err error
 
@@ -125,7 +125,7 @@ func getRequestNumberFromLine(line string) string {
 	return splitLine[0]
 }
 
-func moveViewCursorUp(g *gocui.Gui, v *gocui.View, dY int) error {
+func moveViewCursorUp(v *gocui.View, dY int) error {
 	ox, oy := v.Origin()
 	cx, cy := v.Cursor()
 	if cy > dY {
@@ -138,10 +138,10 @@ func moveViewCursorUp(g *gocui.Gui, v *gocui.View, dY int) error {
 	return nil
 }
 
-func moveViewCursorDown(g *gocui.Gui, v *gocui.View, allowEmpty bool) error {
+func moveViewCursorDown(v *gocui.View, allowEmpty bool) error {
 	cx, cy := v.Cursor()
 	ox, oy := v.Origin()
-	nextLine, err := getNextViewLine(g, v)
+	nextLine, err := getNextViewLine(v)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func moveViewCursorDown(g *gocui.Gui, v *gocui.View, allowEmpty bool) error {
 	return nil
 }
 
-func getNextViewLine(g *gocui.Gui, v *gocui.View) (string, error) {
+func getNextViewLine(v *gocui.View) (string, error) {
 	var l string
 	var err error
 

@@ -31,8 +31,8 @@ var keys []Key = []Key{
 
 func InitCui(guiLogger *log.Logger) {
 	logger = guiLogger
-	gui, err := gocui.NewGui(gocui.OutputNormal)
 	connMap = map[gopacket.Flow]int{}
+	gui, err := gocui.NewGui(gocui.OutputNormal)
 
 	if err != nil {
 		panic(fmt.Sprintf("could not init new gui: %s\n", err.Error()))
