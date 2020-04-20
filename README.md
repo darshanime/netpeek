@@ -36,3 +36,12 @@ Verbose logging
 
 - `cui` (experimental)  
 Use CUI (character user interface) mode  
+
+
+## Demo
+
+[![netpeek-demo](https://asciinema.org/a/GYXAvHeC0kKrNtRN9VlZsaJ2j.svg)](https://asciinema.org/a/GYXAvHeC0kKrNtRN9VlZsaJ2j?autoplay=1&speed=2)
+
+
+### Credits
+I've liberally taken inspiration and code from the [JulienBreux/pody](https://github.com/JulienBreux/pody/) project for the CUI interface.
