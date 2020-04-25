@@ -1,7 +1,9 @@
 package print
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -33,11 +35,26 @@ func ResponseToString(resp *http.Response) string {
 		str.WriteString(key + ": " + strings.Join(val, ",") + "\n")
 	}
 	str.WriteString("\n")
-	rcBody, err := ioutil.ReadAll(resp.Body)
+
+	var reader io.ReadCloser
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			reader = resp.Body
+		} else {
+			reader = gzipReader
+		}
+		defer gzipReader.Close()
+	default:
+		reader = resp.Body
+	}
+	defer resp.Body.Close()
+
+	rcBody, err := ioutil.ReadAll(reader)
 	if err != nil {
 		panic(fmt.Sprintf("cannot read resp.Body - %s\n", err.Error()))
 	}
-	defer resp.Body.Close()
 	str.Write(rcBody)
 	return str.String()
 }
