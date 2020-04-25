@@ -37,16 +37,16 @@ func ResponseToString(resp *http.Response) string {
 	str.WriteString("\n")
 
 	var reader io.ReadCloser
-	switch resp.Header.Get("Content-Encoding") {
-	case "gzip":
+
+	if contentEncoding := resp.Header.Get("Content-Encoding"); contentEncoding == "gzip" {
 		gzipReader, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			reader = resp.Body
+			defer gzipReader.Close()
 		} else {
 			reader = gzipReader
 		}
-		defer gzipReader.Close()
-	default:
+	} else {
 		reader = resp.Body
 	}
 	defer resp.Body.Close()
