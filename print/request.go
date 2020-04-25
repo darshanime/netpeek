@@ -11,7 +11,7 @@ import (
 
 func RequestToString(req *http.Request) string {
 	var str strings.Builder
-	str.WriteString(req.Method + " " + req.URL.String() + "\n")
+	str.WriteString(req.Method + " " + req.Host + req.URL.String() + "\n")
 	for key, val := range req.Header {
 		str.WriteString(key + ": " + strings.Join(val, ",") + "\n")
 	}
