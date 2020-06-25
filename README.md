@@ -8,16 +8,16 @@ Some flags for filtering the packets based on host and ports:
 
 
 - `sport`  
-Destination host of the packet  
+Source port of the packet
 
 - `dport`  
-Destination port of the packet  
+Destination port of the packet
 
 - `shost`  
-Destination host of the packet  
+Source host of the packet
 
 - `dhost`  
-Destination port of the packet  
+Destination host of the packet
 
 - `i`  
 Network interface to sniff on  
