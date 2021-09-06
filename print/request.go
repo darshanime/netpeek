@@ -20,7 +20,6 @@ func RequestToString(req *http.Request) string {
 	if err != nil {
 		panic(fmt.Sprintf("cannot read resp.Body - %s\n", err.Error()))
 	}
-	defer req.Body.Close()
 	str.Write(rcBody)
 	return str.String()
 }

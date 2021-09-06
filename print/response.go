@@ -16,11 +16,13 @@ func Output(req *http.Request, resp *http.Response, pktInfo []stats.PacketInfo) 
 	var reqStr, respStr, pktStr string
 	if req != nil {
 		reqStr = RequestToString(req)
+		req.Body.Close()
 	} else {
 		reqStr = "**** no req\n"
 	}
 	if resp != nil {
 		respStr = ResponseToString(resp)
+		resp.Body.Close()
 	} else {
 		respStr = "**** no resp\n"
 	}
@@ -49,7 +51,6 @@ func ResponseToString(resp *http.Response) string {
 	} else {
 		reader = resp.Body
 	}
-	defer resp.Body.Close()
 
 	rcBody, err := ioutil.ReadAll(reader)
 	if err != nil {
